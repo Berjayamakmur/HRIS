@@ -887,6 +887,18 @@ function mapAttendanceRow_(row) {
 }
 
 function handleGetAttendanceStatusToday_(sessionUser) {
+  if (sessionUser && sessionUser.role === 'Admin') {
+    return {
+      success: true,
+      isAdminExempt: true,
+      message: 'Akun Admin tidak memerlukan absensi selfie.',
+      tanggal: formatJakartaDate_(),
+      masuk: null,
+      pulang: null,
+      settings: readSettingsMap_()
+    };
+  }
+
   var today = formatJakartaDate_();
   var rows = getDataRows_(SHEET_NAMES.ABSENSI);
   var masukRecord = null;
@@ -910,6 +922,9 @@ function handleGetAttendanceStatusToday_(sessionUser) {
 }
 
 function handleSubmitAttendance_(sessionUser, payload) {
+  if (sessionUser && sessionUser.role === 'Admin') {
+    return { success: false, message: 'Akun Admin tidak melakukan absensi selfie.' };
+  }
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
@@ -1527,7 +1542,7 @@ function handleGetDashboard_(sessionUser, payload) {
   for (var i = 0; i < empRows.length; i++) {
     var e = mapEmployeeRow_(empRows[i]);
     empMap[e.id] = e;
-    if (e.status === 'Aktif') {
+    if (e.status === 'Aktif' && e.role !== 'Admin') {
       activeEmployees.push(e);
       var dept = e.departemen || 'Umum';
       deptTotals[dept] = (deptTotals[dept] || 0) + 1;
@@ -1544,6 +1559,10 @@ function handleGetDashboard_(sessionUser, payload) {
 
   for (var a = 0; a < absRows.length; a++) {
     var abs = mapAttendanceRow_(absRows[a]);
+    var absEmp = empMap[abs.idKaryawan];
+    if (absEmp && absEmp.role === 'Admin') {
+      continue;
+    }
     if (abs.tanggal >= startDate && abs.tanggal <= today) {
       if (!isAdmin && abs.idKaryawan !== sessionUser.id) {
         continue;
@@ -1557,9 +1576,8 @@ function handleGetDashboard_(sessionUser, payload) {
     }
     if (abs.tanggal === today && abs.tipe === 'Masuk') {
       presentUniqueToday[abs.idKaryawan] = abs;
-      var empObj = empMap[abs.idKaryawan];
-      if (empObj) {
-        var dName = empObj.departemen || 'Umum';
+      if (absEmp) {
+        var dName = absEmp.departemen || 'Umum';
         deptPresentToday[dName] = deptPresentToday[dName] || {};
         deptPresentToday[dName][abs.idKaryawan] = true;
       }

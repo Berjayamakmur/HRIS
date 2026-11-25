@@ -242,18 +242,21 @@
 # ==============================================================================
 
 ## Status Arsitektur & Lingkungan Aktif
-- **Fase:** Kode v1.0 telah selesai dibangun dan siap deploy.
-- **Berkas Aktif:** `setup.gs`, `code.gs`, `index.html`, `styles.css`, `app.js`, `README.md`.
-- **Stack Terpilih:** Frontend Statis (GitHub Pages / Vercel: `index.html`, `styles.css`, `app.js`) + Backend Google Apps Script (`code.gs`, `setup.gs`) + Google Sheets + Google Drive.
+- **Fase:** Kode v1.1 telah diperbarui (Admin bebas absensi selfie + Kop Surat & Logo resmi Depok).
+- **Berkas Aktif:** `setup.gs`, `code.gs`, `index.html`, `styles.css`, `app.js`, `logo-bmi.jpg`, `README.md`.
+- **Stack Terpilih:** Frontend Statis (GitHub Pages / Vercel: `index.html`, `styles.css`, `app.js`, `logo-bmi.jpg`) + Backend Google Apps Script (`code.gs`, `setup.gs`) + Google Sheets + Google Drive.
 
 ## Skema Kolom Database Terkini
 - Tab Sheet (bebas underscore): `DataKaryawan` (11 kolom), `LogAbsensi` (14 kolom), `PengajuanCuti` (13 kolom), `PengajuanLembur` (12 kolom), `DataSlipGaji` (13 kolom), `PengaturanSistem` (3 kolom), `HariLibur` (3 kolom).
 
 ## Logika Bisnis & Formula Hitung Berlaku
+- **Peran Admin vs Karyawan pada Absensi:** Akun `Admin` tidak melakukan absensi selfie (menu `Absensi Selfie` & tombol *"Absen Sekarang"* disembunyikan untuk Admin, backend menolak `submitAttendance` dari role `Admin`, dan perhitungan metrik wajib absen / progres departemen di Dashboard mengecualikan akun `Admin`).
+- **Kop Surat & Logo Resmi PDF:** Menggunakan logo horizontal `logo-bmi.jpg` (atau logo unggahan custom Admin) secara proporsional dengan alamat resmi `Komplek DDN No.Kav 23, Harjamukti, Kec. Cimanggis, Kota Depok, Jawa Barat 16454`, kontak `Telp: 02138852384 | Website: https://www.berjaya-makmur-indonesia.co.id/`, dan Kota TTD `Depok`.
 - Jam kerja tetap + toleransi menit keterlambatan (dikelola di `PengaturanSistem`).
 - Deteksi lokasi menggunakan formula Haversine (meter); luar radius berstatus `Luar Radius` dengan alasan wajib terisi.
 - Slip gaji terstruktur: `TotalGajiBersih = GajiPokok + Tunjangan + UangLembur - Potongan`.
 - Seluruh ID entitas menggunakan generator `PREFIX-YYYYMM-XXX` / `PREFIX-YYYYMMDD-XXX` berbasis `MAX + 1` + `LockService`.
 
 ## Log Pembaruan Resmi
-- `2026-11-25`: Penyusunan awal `prd.md` berdasarkan wawancara kebutuhan PT. BERJAYA MAKMUR INDONESIA dan referensi desain dashboard.
+- `2026-11-25` (v1.1): Penghapusan fitur & kewajiban absensi selfie pada akun Admin (UI & Backend Dashboard/Attendance) serta pembaruan Kop Surat resmi Depok + aset logo `logo-bmi.jpg`.
+- `2026-11-25` (v1.0): Implementasi awal aplikasi HRIS Digital PT. BERJAYA MAKMUR INDONESIA.

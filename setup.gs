@@ -212,15 +212,15 @@ function seedInitialDataIfEmpty_(ss, folders) {
   if (settingSheet.getLastRow() <= 1) {
     var defaultSettings = [
       ['NAMA_PERUSAHAAN', 'PT. BERJAYA MAKMUR INDONESIA', 'Nama resmi perusahaan pada kop surat'],
-      ['ALAMAT_PERUSAHAAN', 'Jl. Jend. Sudirman Kav. 52-53, Jakarta Selatan 12190', 'Alamat perusahaan pada kop surat PDF'],
-      ['KONTAK_PERUSAHAAN', 'Telp: (021) 555-0199 | Email: hrd@berjayamakmur.co.id', 'Kontak perusahaan pada kop surat PDF'],
+      ['ALAMAT_PERUSAHAAN', 'Komplek DDN No.Kav 23, Harjamukti, Kec. Cimanggis, Kota Depok, Jawa Barat 16454', 'Alamat perusahaan pada kop surat PDF'],
+      ['KONTAK_PERUSAHAAN', 'Telp: 02138852384 | Website: https://www.berjaya-makmur-indonesia.co.id/', 'Kontak perusahaan pada kop surat PDF'],
       ['LOGO_URL', '', 'Link Google Drive logo perusahaan'],
       ['LOGO_BASE64', '', 'Data gambar logo terkompresi untuk render PDF bebas CORS'],
-      ['KOTA_TTD', 'Jakarta', 'Nama kota pada blok tanda tangan PDF'],
+      ['KOTA_TTD', 'Depok', 'Nama kota pada blok tanda tangan PDF'],
       ['TTD_NAMA', 'Administrator HRD', 'Nama pejabat penandatangan PDF'],
       ['TTD_JABATAN', 'HRD Manager', 'Jabatan pejabat penandatangan PDF'],
-      ['KANTOR_LAT', '-6.208800', 'Koordinat Latitude kantor'],
-      ['KANTOR_LNG', '106.845600', 'Koordinat Longitude kantor'],
+      ['KANTOR_LAT', '-6.373600', 'Koordinat Latitude kantor'],
+      ['KANTOR_LNG', '106.890200', 'Koordinat Longitude kantor'],
       ['RADIUS_METER', '150', 'Batas radius absensi dalam meter'],
       ['JAM_MASUK', '08:00', 'Jam masuk kerja standar (HH:mm)'],
       ['JAM_PULANG', '17:00', 'Jam pulang kerja standar (HH:mm)'],
@@ -228,6 +228,20 @@ function seedInitialDataIfEmpty_(ss, folders) {
       ['FOLDER_ROOT_ID', folders.rootId, 'ID Folder Root Google Drive HRIS']
     ];
     settingSheet.getRange(2, 1, defaultSettings.length, 3).setValues(defaultSettings);
+  } else {
+    // Sinkronisasi aman jika masih memakai alamat default template awal
+    var existingSettings = settingSheet.getRange(2, 1, settingSheet.getLastRow() - 1, 2).getDisplayValues();
+    for (var sIdx = 0; sIdx < existingSettings.length; sIdx++) {
+      var sKey = existingSettings[sIdx][0];
+      var sVal = existingSettings[sIdx][1];
+      if (sKey === 'ALAMAT_PERUSAHAAN' && sVal === 'Jl. Jend. Sudirman Kav. 52-53, Jakarta Selatan 12190') {
+        settingSheet.getRange(sIdx + 2, 2).setValue('Komplek DDN No.Kav 23, Harjamukti, Kec. Cimanggis, Kota Depok, Jawa Barat 16454');
+      } else if (sKey === 'KONTAK_PERUSAHAAN' && sVal === 'Telp: (021) 555-0199 | Email: hrd@berjayamakmur.co.id') {
+        settingSheet.getRange(sIdx + 2, 2).setValue('Telp: 02138852384 | Website: https://www.berjaya-makmur-indonesia.co.id/');
+      } else if (sKey === 'KOTA_TTD' && sVal === 'Jakarta') {
+        settingSheet.getRange(sIdx + 2, 2).setValue('Depok');
+      }
+    }
   }
 
   // 3. Seed HariLibur

@@ -16,6 +16,13 @@
   // Jika dikosongkan, user tetap bisa mengisi URL lewat tombol "Pengaturan URL Server Backend" di halaman Login.
   var DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycby3nWhp-Qks2-fcOD3QQJukwcMUvhpS-phMtjpPjD3BVS5wBaYuov3xyB6RDjmyEk4C/exec';
 
+  var DEFAULT_KOP = {
+    NAMA_PERUSAHAAN: 'PT. BERJAYA MAKMUR INDONESIA',
+    ALAMAT_PERUSAHAAN: 'Komplek DDN No.Kav 23, Harjamukti, Kec. Cimanggis, Kota Depok, Jawa Barat 16454',
+    KONTAK_PERUSAHAAN: 'Telp: 02138852384 | Website: https://www.berjaya-makmur-indonesia.co.id/',
+    KOTA_TTD: 'Depok'
+  };
+
   var STORAGE_KEYS = {
     API_URL: 'hris_bmi_api_url',
     TOKEN: 'hris_bmi_token',
@@ -27,6 +34,7 @@
     token: localStorage.getItem(STORAGE_KEYS.TOKEN) || '',
     user: safeJsonParse(localStorage.getItem(STORAGE_KEYS.USER), null),
     settings: {},
+    defaultLogoBase64: '',
     route: 'dashboard',
     dashPeriod: 'today',
     cache: {},
@@ -297,13 +305,17 @@
 
   function getNavItems() {
     var items = [
-      { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-      { id: 'absen', label: 'Absensi Selfie', icon: 'camera' },
+      { id: 'dashboard', label: 'Dashboard', icon: 'dashboard' }
+    ];
+    if (!isAdmin()) {
+      items.push({ id: 'absen', label: 'Absensi Selfie', icon: 'camera' });
+    }
+    items.push(
       { id: 'rekap', label: 'Rekap & PDF', icon: 'report' },
       { id: 'cuti', label: 'Cuti / Ijin / Sakit', icon: 'calendar', badge: isAdmin() ? state.pendingCounts.cuti : 0 },
       { id: 'lembur', label: 'Pengajuan Lembur', icon: 'clock', badge: isAdmin() ? state.pendingCounts.lembur : 0 },
       { id: 'gaji', label: 'Slip Gaji', icon: 'wallet' }
-    ];
+    );
     if (isAdmin()) {
       items.push({ id: 'karyawan', label: 'Kelola Karyawan', icon: 'users' });
       items.push({ id: 'pengaturan', label: 'Pengaturan & Map', icon: 'mapPin' });
@@ -327,12 +339,15 @@
     }).join('');
     document.getElementById('sidebarNav').innerHTML = sidebarHtml;
 
-    // Mobile Bottom Bar (4 utama + Lainnya)
-    var primaryIds = ['dashboard', 'absen', 'cuti', 'gaji'];
+    // Mobile Bottom Bar (4 utama + Lainnya; Admin fokus ke Rekap, bukan Absen)
+    var primaryIds = isAdmin() ? ['dashboard', 'rekap', 'cuti', 'gaji'] : ['dashboard', 'absen', 'cuti', 'gaji'];
     var bottomHtml = primaryIds.map(function (pid) {
       var found = navItems.find(function (it) { return it.id === pid; });
       if (!found) return '';
-      var shortLabel = pid === 'dashboard' ? 'Beranda' : (pid === 'absen' ? 'Absen' : (pid === 'cuti' ? 'Izin/Cuti' : 'Slip Gaji'));
+      var shortLabel = pid === 'dashboard' ? 'Beranda'
+        : (pid === 'absen' ? 'Absen'
+        : (pid === 'rekap' ? 'Rekap'
+        : (pid === 'cuti' ? 'Izin/Cuti' : 'Slip Gaji')));
       var activeCls = state.route === pid ? ' active' : '';
       return '<button type="button" class="bottom-nav-btn' + activeCls + '" data-nav="' + pid + '">' +
         svgIcon(found.icon) +
@@ -346,6 +361,17 @@
       '<span>Lainnya</span>' +
       '</button>';
     document.getElementById('mobileBottomNav').innerHTML = bottomHtml;
+
+    var quickBtn = document.getElementById('sidebarQuickAbsenBtn');
+    if (quickBtn) {
+      if (isAdmin()) {
+        quickBtn.setAttribute('data-nav', 'rekap');
+        quickBtn.textContent = 'Lihat Rekap Absensi';
+      } else {
+        quickBtn.setAttribute('data-nav', 'absen');
+        quickBtn.textContent = 'Absen Sekarang';
+      }
+    }
 
     // Mobile Drawer Items (sisa menu)
     var drawerItems = navItems.filter(function (it) { return primaryIds.indexOf(it.id) === -1; });
@@ -468,6 +494,10 @@
 
   async function renderCurrentRoute() {
     var container = document.getElementById('pageContent');
+    if (state.route === 'absen' && isAdmin()) {
+      state.route = 'rekap';
+      renderNavigation();
+    }
     if (state.route === 'dashboard') await renderDashboardView(container);
     else if (state.route === 'absen') await renderAbsensiView(container);
     else if (state.route === 'rekap') await renderRekapView(container);
@@ -627,7 +657,9 @@
       '<option value="week"' + (state.dashPeriod === 'week' ? ' selected' : '') + '>7 Hari Terakhir</option>' +
       '<option value="month"' + (state.dashPeriod === 'month' ? ' selected' : '') + '>Bulan Ini</option>' +
       '</select>' +
-      '<button type="button" class="btn btn-primary" data-nav="absen">' + svgIcon('camera') + '<span>Absen Sekarang</span></button>' +
+      (adminMode
+        ? '<button type="button" class="btn btn-primary" data-nav="rekap">' + svgIcon('report') + '<span>Rekap Absensi</span></button>'
+        : '<button type="button" class="btn btn-primary" data-nav="absen">' + svgIcon('camera') + '<span>Absen Sekarang</span></button>') +
       '</div></div>' +
 
       '<div class="metrics-grid">' + metricsHtml + '</div>' +
@@ -972,41 +1004,66 @@
     }
   }
 
+  function preloadDefaultLogo() {
+    if (state.defaultLogoBase64) return;
+    var img = new Image();
+    img.onload = function () {
+      try {
+        var maxW = 420;
+        var scale = img.width > maxW ? (maxW / img.width) : 1;
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        state.defaultLogoBase64 = canvas.toDataURL('image/jpeg', 0.9);
+      } catch (e) { /* abaikan jika gagal kanvas */ }
+    };
+    img.src = 'logo-bmi.jpg';
+  }
+
   function renderKopSuratPdf(doc, settings) {
     var pageW = doc.internal.pageSize.getWidth();
-    var namaPt = settings.NAMA_PERUSAHAAN || 'PT. BERJAYA MAKMUR INDONESIA';
-    var alamat = settings.ALAMAT_PERUSAHAAN || '';
-    var kontak = settings.KONTAK_PERUSAHAAN || '';
-    var logoB64 = settings.LOGO_BASE64 || '';
+    var namaPt = settings.NAMA_PERUSAHAAN || DEFAULT_KOP.NAMA_PERUSAHAAN;
+    var alamat = settings.ALAMAT_PERUSAHAAN || DEFAULT_KOP.ALAMAT_PERUSAHAAN;
+    var kontak = settings.KONTAK_PERUSAHAAN || DEFAULT_KOP.KONTAK_PERUSAHAAN;
+    var logoB64 = settings.LOGO_BASE64 || state.defaultLogoBase64 || '';
 
-    var textStartX = 14;
+    var logoEndX = 14;
     if (logoB64 && logoB64.indexOf('data:image') === 0) {
       try {
-        doc.addImage(logoB64, 'PNG', 14, 10, 18, 18);
-        textStartX = 36;
+        var props = doc.getImageProperties(logoB64);
+        var ratio = (props && props.width && props.height) ? (props.width / props.height) : 3.6;
+        var targetH = 11.5;
+        var targetW = Math.min(42, targetH * ratio);
+        targetH = targetW / ratio;
+        var fmt = logoB64.indexOf('image/png') !== -1 ? 'PNG' : 'JPEG';
+        doc.addImage(logoB64, fmt, 14, 10 + ((14 - targetH) / 2), targetW, targetH);
+        logoEndX = 14 + targetW + 6;
       } catch (e) {
-        textStartX = 14;
+        logoEndX = 14;
       }
     }
 
-    var centerX = textStartX > 20 ? (pageW + 20) / 2 : pageW / 2;
+    var textCenterX = logoEndX > 20 ? (logoEndX + (pageW - 14)) / 2 : pageW / 2;
+    var maxTextW = pageW - logoEndX - 18;
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
+    doc.setFontSize(13.5);
     doc.setTextColor(15, 23, 42);
-    doc.text(namaPt, centerX, 16, { align: 'center' });
+    doc.text(namaPt, textCenterX, 14.5, { align: 'center', maxWidth: maxTextW });
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(71, 85, 105);
-    if (alamat) doc.text(alamat, centerX, 21.5, { align: 'center' });
-    if (kontak) doc.text(kontak, centerX, 26, { align: 'center' });
+    if (alamat) doc.text(alamat, textCenterX, 20, { align: 'center', maxWidth: maxTextW });
+    if (kontak) doc.text(kontak, textCenterX, 25.5, { align: 'center', maxWidth: maxTextW });
 
     doc.setDrawColor(5, 150, 105);
     doc.setLineWidth(0.8);
-    doc.line(14, 30, pageW - 14, 30);
+    doc.line(14, 30.5, pageW - 14, 30.5);
     doc.setLineWidth(0.3);
-    doc.line(14, 31.3, pageW - 14, 31.3);
-    return 37;
+    doc.line(14, 31.8, pageW - 14, 31.8);
+    return 38;
   }
 
   async function handleDownloadRekapPdf() {
@@ -1067,7 +1124,7 @@
       }
 
       var signX = doc.internal.pageSize.getWidth() - 75;
-      var kota = settings.KOTA_TTD || 'Jakarta';
+      var kota = settings.KOTA_TTD || DEFAULT_KOP.KOTA_TTD;
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9.5);
       doc.text(kota + ', ' + formatDateId(todayDateStr()), signX, finalY);
@@ -1610,7 +1667,7 @@
       endY += 10;
     }
 
-    var kota = settings.KOTA_TTD || 'Jakarta';
+    var kota = settings.KOTA_TTD || DEFAULT_KOP.KOTA_TTD;
     doc.setFontSize(9.5);
     doc.text('Diterima oleh,', 24, endY + 4);
     doc.text(kota + ', ' + formatDateId(todayDateStr()), 135, endY + 4);
@@ -1852,18 +1909,19 @@
         '<div class="table-wrap"><table class="data-table"><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Aksi</th></tr></thead><tbody>' + holRows + '</tbody></table></div>' +
         '</div></div>';
     } else {
+      var logoPreviewSrc = s.LOGO_BASE64 || state.defaultLogoBase64 || 'logo-bmi.jpg';
       tabContentHtml = '<form id="kopSettingsForm" class="card stack-form">' +
         '<h2 class="card-title">Kop Surat PDF &amp; Pejabat Penandatangan</h2>' +
-        '<div class="form-group"><label>Nama Perusahaan</label><input type="text" id="setNamaPt" value="' + escapeHtml(s.NAMA_PERUSAHAAN || 'PT. BERJAYA MAKMUR INDONESIA') + '" required /></div>' +
-        '<div class="form-group"><label>Alamat Lengkap</label><input type="text" id="setAlamatPt" value="' + escapeHtml(s.ALAMAT_PERUSAHAAN || '') + '" required /></div>' +
-        '<div class="form-group"><label>Kontak (Telepon / Email)</label><input type="text" id="setKontakPt" value="' + escapeHtml(s.KONTAK_PERUSAHAAN || '') + '" /></div>' +
+        '<div class="form-group"><label>Nama Perusahaan</label><input type="text" id="setNamaPt" value="' + escapeHtml(s.NAMA_PERUSAHAAN || DEFAULT_KOP.NAMA_PERUSAHAAN) + '" required /></div>' +
+        '<div class="form-group"><label>Alamat Lengkap</label><input type="text" id="setAlamatPt" value="' + escapeHtml(s.ALAMAT_PERUSAHAAN || DEFAULT_KOP.ALAMAT_PERUSAHAAN) + '" required /></div>' +
+        '<div class="form-group"><label>Kontak (Telepon / Website)</label><input type="text" id="setKontakPt" value="' + escapeHtml(s.KONTAK_PERUSAHAAN || DEFAULT_KOP.KONTAK_PERUSAHAAN) + '" /></div>' +
         '<div class="form-grid-2">' +
-        '<div class="form-group"><label>Kota Tanda Tangan</label><input type="text" id="setKotaTtd" value="' + escapeHtml(s.KOTA_TTD || 'Jakarta') + '" required /></div>' +
+        '<div class="form-group"><label>Kota Tanda Tangan</label><input type="text" id="setKotaTtd" value="' + escapeHtml(s.KOTA_TTD || DEFAULT_KOP.KOTA_TTD) + '" required /></div>' +
         '<div class="form-group"><label>Jabatan Penandatangan</label><input type="text" id="setJabatanTtd" value="' + escapeHtml(s.TTD_JABATAN || 'HRD Manager') + '" required /></div>' +
         '</div>' +
         '<div class="form-group"><label>Nama Pejabat Penandatangan</label><input type="text" id="setNamaTtd" value="' + escapeHtml(s.TTD_NAMA || 'Administrator HRD') + '" required /></div>' +
         '<div class="form-group"><label>Logo Perusahaan (PNG/JPG untuk Kop Surat PDF)</label>' +
-        (s.LOGO_BASE64 ? '<img src="' + s.LOGO_BASE64 + '" alt="Logo" style="width:64px;height:64px;object-fit:contain;border:1px solid var(--border);border-radius:8px;padding:4px" />' : '') +
+        '<img src="' + escapeHtml(logoPreviewSrc) + '" alt="Logo Perusahaan" style="max-width:180px;height:auto;object-fit:contain;border:1px solid var(--border);border-radius:8px;padding:6px;background:#fff" />' +
         '<input type="file" id="setLogoFile" accept="image/*" />' +
         '</div>' +
         '<button type="submit" id="saveKopBtn" class="btn btn-primary">Simpan Kop Surat &amp; TTD</button>' +
@@ -2191,10 +2249,6 @@
       renderCurrentRoute();
     });
 
-    document.getElementById('sidebarQuickAbsenBtn').addEventListener('click', function () {
-      navigateTo('absen');
-    });
-
     document.getElementById('userChipBtn').addEventListener('click', function () {
       navigateTo('profil');
     });
@@ -2317,6 +2371,7 @@
   }
 
   function bootstrap() {
+    preloadDefaultLogo();
     bindGlobalEvents();
     if (state.apiUrl) {
       testServerConnection(state.apiUrl);
