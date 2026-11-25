@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#059669" />
+  <title>HRIS Digital — PT. BERJAYA MAKMUR INDONESIA</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Leaflet.js untuk pengaturan peta & radius kantor -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <!-- jsPDF + AutoTable untuk Rekap Absensi PDF & Slip Gaji PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js" crossorigin="anonymous"></script>
+
+  <!-- SheetJS untuk Export Excel Rekap Absensi -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <!-- Custom Modal Container -->
+  <div id="modalBackdrop" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div id="modalDialog" class="modal-dialog">
+      <div class="modal-header">
+        <h3 id="modalTitle" class="modal-title">Judul</h3>
+        <button type="button" id="modalCloseBtn" class="icon-btn" aria-label="Tutup modal">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="modalBody" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Mobile Overflow Drawer ("Lainnya") -->
+  <div id="mobileDrawerBackdrop" class="drawer-backdrop hidden">
+    <div class="drawer-sheet">
+      <div class="drawer-handle"></div>
+      <div class="drawer-header">
+        <span class="drawer-title">Menu Lainnya</span>
+        <button type="button" id="drawerCloseBtn" class="icon-btn" aria-label="Tutup menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="mobileDrawerList" class="drawer-list"></div>
+    </div>
+  </div>
+
+  <!-- LOGIN VIEW -->
+  <section id="loginView" class="login-screen">
+    <div class="login-bg-decor decor-1"></div>
+    <div class="login-bg-decor decor-2"></div>
+
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="login-company">PT. BERJAYA MAKMUR INDONESIA</h1>
+          <p class="login-subtitle">Sistem Informasi HRIS &amp; Absensi Digital</p>
+        </div>
+      </div>
+
+      <form id="loginForm" class="stack-form">
+        <div class="form-group">
+          <label for="loginNip">ID Karyawan (NIP)</label>
+          <input type="text" id="loginNip" placeholder="Contoh: ADM001 atau KRY-202611-001" autocomplete="username" required />
+        </div>
+
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <div class="password-wrap">
+            <input type="password" id="loginPassword" placeholder="Masukkan password Anda" autocomplete="current-password" required />
+            <button type="button" id="toggleLoginPass" class="pass-toggle" aria-label="Lihat password">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" id="loginSubmitBtn" class="btn btn-primary btn-block">
+          <span>Masuk ke Aplikasi</span>
+        </button>
+      </form>
+
+      <div class="login-footer">
+        <button type="button" id="openApiConfigBtn" class="btn-link">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Pengaturan URL Server Backend</span>
+        </button>
+        <span id="serverStatusPill" class="status-pill neutral">Belum Terhubung</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- MAIN APP SHELL -->
+  <div id="appShell" class="app-shell hidden">
+    <!-- Left Sidebar (Desktop) -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-mark small">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <strong>Berjaya HRIS</strong>
+          <span>PT. BERJAYA MAKMUR</span>
+        </div>
+      </div>
+
+      <nav id="sidebarNav" class="sidebar-nav" aria-label="Navigasi Utama"></nav>
+
+      <div class="sidebar-promo">
+        <div class="promo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <h4>Jam Kerja &amp; Radius</h4>
+        <p id="sidebarShiftInfo">Shift 08:00 - 17:00 • Radius 150m</p>
+        <button type="button" id="sidebarQuickAbsenBtn" class="btn btn-primary btn-sm btn-block">Absen Sekarang</button>
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <div class="main-area">
+      <!-- Top Header -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="mobile-brand-mini">
+            <div class="brand-mark tiny">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+              </svg>
+            </div>
+            <span>Berjaya HRIS</span>
+          </div>
+          <div class="global-search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" id="globalSearchInput" placeholder="Cari karyawan, absensi, cuti, atau slip gaji..." />
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <button type="button" id="refreshViewBtn" class="icon-btn" title="Segarkan Data" aria-label="Segarkan Data">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+          </button>
+
+          <button type="button" id="notifBellBtn" class="icon-btn notif-btn" title="Notifikasi Pengajuan" aria-label="Notifikasi">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            <span id="notifBadge" class="notif-badge hidden">0</span>
+          </button>
+
+          <div class="user-chip" id="userChipBtn">
+            <div id="topbarAvatar" class="avatar-circle">A</div>
+            <div class="user-chip-info">
+              <span id="topbarUserName" class="user-name">User</span>
+              <span id="topbarUserRole" class="user-role">Role</span>
+            </div>
+          </div>
+
+          <button type="button" id="logoutBtn" class="icon-btn danger-hover" title="Keluar" aria-label="Keluar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Dynamic Page Content -->
+      <main id="pageContent" class="page-content"></main>
+    </div>
+
+    <!-- Bottom Navigation (Mobile) -->
+    <nav id="mobileBottomNav" class="mobile-bottom-nav" aria-label="Navigasi Bawah"></nav>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
